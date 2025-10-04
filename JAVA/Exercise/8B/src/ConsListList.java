@@ -5,6 +5,8 @@ import java.util.ListIterator;
 import java.util.Objects;
 import java.util.NoSuchElementException;
 import java.util.ConcurrentModificationException;
+import java.util.AbstractList;
+
 
 public class ConsListList<T> implements java.util.List<T> {
 
@@ -191,6 +193,133 @@ public class ConsListList<T> implements java.util.List<T> {
         return last;
     }
 
+    @Override
+    public java.util.List<T> subList(int fromIndex, int toIndex) throws IndexOutOfBoundsException {
+        if (fromIndex < 0 || toIndex < fromIndex || toIndex > size)
+            throw new IndexOutOfBoundsException("from=" + fromIndex + ", to=" + toIndex + ", size=" + size);
+        return new SubList(fromIndex, toIndex);
+    }
+
+    /* ---------- Inner backed view ---------- */
+    private final class SubList extends AbstractList<T> {
+        private int offset;              // 在父表中的起始位置
+        private int length;              // 视图长度
+        private int expectedModCount;    // 捕获创建时父表的 modCount，用于 fail-fast
+
+        SubList(int from, int to) {
+            this.offset = from;
+            this.length = to - from;
+            this.expectedModCount = modCount;
+        }
+
+        /* 小工具：并发修改检测 */
+        private void checkForComodification() {
+            if (expectedModCount != modCount) throw new ConcurrentModificationException();
+        }
+        private void rangeCheckIndex(int index) {
+            if (index < 0 || index >= length) throw new IndexOutOfBoundsException("index=" + index + ", length=" + length);
+        }
+        private void rangeCheckIndexForAdd(int index) {
+            if (index < 0 || index > length) throw new IndexOutOfBoundsException("index=" + index + ", length=" + length);
+        }
+
+        /* Design Recipe — size()
+         * Purpose: 返回视图中的元素个数
+         * Strategy: 返回 length，先做 fail-fast 检查
+         */
+        @Override
+        public int size() {
+            checkForComodification();
+            return length;
+        }
+
+        /* Design Recipe — get(int)
+         * Purpose: 读取区间内第 index 个元素
+         * Strategy: 越界检查 → fail-fast → 读取父表 offset+index 位置
+         */
+        @Override
+        public T get(int index) {
+            rangeCheckIndex(index);
+            checkForComodification();
+            return ConsListList.this.get(offset + index);
+        }
+
+        /* Design Recipe — set(int, T)
+         * Purpose: 就地修改区间内元素；非结构性修改（不改变长度）
+         * Strategy: 越界检查 → fail-fast → 委托父表 set
+         */
+        @Override
+        public T set(int index, T element) {
+            rangeCheckIndex(index);
+            checkForComodification();
+            // 父表 set 不改变结构，因此父表 modCount 不变，无需刷新 expectedModCount
+            return ConsListList.this.set(offset + index, element);
+        }
+
+        /* Design Recipe — add(int, T)
+         * Purpose: 在视图 index 处插入（结构性修改）
+         * Strategy: 检查/失败快 → 调用父表 add(offset+index, e)
+         * Effect: 视图长度 +1；父表 modCount 变动 → 刷新 expectedModCount
+         */
+        @Override
+        public void add(int index, T element) {
+            rangeCheckIndexForAdd(index);
+            checkForComodification();
+            ConsListList.this.add(offset + index, element);
+            length++;
+            expectedModCount = modCount; // 父表已变动，刷新
+        }
+
+        /* Design Recipe — remove(int)
+         * Purpose: 删除并返回视图 index 处元素（结构性修改）
+         * Strategy: 检查/失败快 → 调用父表 remove(offset+index)
+         * Effect: 视图长度 -1；父表 modCount 变动 → 刷新 expectedModCount
+         */
+        @Override
+        public T remove(int index) {
+            rangeCheckIndex(index);
+            checkForComodification();
+            T old = ConsListList.this.remove(offset + index);
+            length--;
+            expectedModCount = modCount;
+            return old;
+        }
+
+        /* Design Recipe — clear()
+         * Purpose: 清空本视图对应的区间
+         * Strategy: 反复从 offset 开始删除 length 次（每次父表结构变更）
+         * Effect: length 置 0，刷新 expectedModCount
+         */
+        @Override
+        public void clear() {
+            checkForComodification();
+            for (int i = 0; i < length; i++) {
+                ConsListList.this.remove(offset); // 总是删“当前区间起点”
+            }
+            length = 0;
+            expectedModCount = modCount;
+        }
+
+        /* 可选：用自定义迭代器，只遍历区间并做 fail-fast */
+        @Override
+        public Iterator<T> iterator() {
+            checkForComodification();
+            return new Iterator<T>() {
+                private int i = 0;
+                private final int startMod = modCount;
+                @Override public boolean hasNext() { return i < length; }
+                @Override public T next() {
+                    if (startMod != modCount) throw new ConcurrentModificationException();
+                    if (i >= length) throw new NoSuchElementException();
+                    return ConsListList.this.get(offset + i++);
+                }
+                @Override public void remove() {
+                    throw new UnsupportedOperationException("iterator.remove not supported");
+                }
+            };
+        }
+    }
+
     /* ===================== 重点：迭代器 ===================== */
 
     /**
@@ -266,5 +395,5 @@ public class ConsListList<T> implements java.util.List<T> {
     @Override public boolean addAll(int index, Collection<? extends T> c) { return false; }
     @Override public ListIterator<T> listIterator() { return null; }
     @Override public ListIterator<T> listIterator(int index) { return null; }
-    @Override public List<T> subList(int fromIndex, int toIndex) { return List.of(); }
+
 }
