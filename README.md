@@ -365,4 +365,255 @@ class GoodIterator {
 
 ---
 
-*Last updated: 2024 | 最后更新: 2024年*
+# 🔎 六、查找与哈希（Searching & Hashing）
+
+### 🔍 Q1: Array Search Methods | 数组查找方法
+
+**English**: What are the two common methods to find the target ID in an array, and what are their key characteristics?  
+**中文**: 在大学ID数组中查找目标ID的两种常见方法是什么，它们的核心特点是什么？
+
+#### 💡 Answer | 答案
+
+```java
+// 🔍 Linear Scan | 线性查找 - O(n)
+for (int i = 0; i < ids.length; i++) {
+    if (ids[i] == targetId) return i;  // Check each element
+}
+
+// 🔍 Binary Search | 二分查找 - O(log n)
+Arrays.sort(ids);  // Requires sorted array | 需要先排序
+int left = 0, right = ids.length - 1;
+while (left <= right) {
+    int mid = left + (right - left) / 2;
+    if (ids[mid] == targetId) return mid;
+    else if (ids[mid] > targetId) right = mid - 1;  // Search left
+    else left = mid + 1;  // Search right
+}
+```
+
+**Comparison Table | 对比表格**:
+
+| Method | Time Complexity | Requires Sorted? | Efficiency |
+|--------|-----------------|------------------|------------|
+| Linear Scan | O(n) | ❌ No | Less efficient for large data |
+| Binary Search | O(log n) | ✅ Yes | More efficient for large data |
+
+**线性查找**: 逐个检查元素，无需数组有序，时间复杂度O(n)  
+**二分查找**: 仅适用于已排序数组，反复将查找范围减半，时间复杂度O(log n)
+
+---
+
+### 🔍 Q2: Java hashCode() Definition | Java hashCode() 定义
+
+**English**: What is `hashCode()` in Java, and how is its default value calculated?  
+**中文**: Java中的`hashCode()`是什么，它的默认值是如何计算的？
+
+#### 💡 Answer | 答案
+
+```java
+Object obj = new Object();
+System.out.println(obj.hashCode());  // e.g., 872627152
+
+// Default implementation based on memory address | 基于内存地址的默认实现
+// Hexadecimal: 34033bd0 → Decimal: 872627152
+```
+
+**Key Points | 关键点**:
+- Returns **int value** for every object | 为每个对象返回int值
+- \(2^{32}\) possible values (~4 billion) | 约40亿种可能取值
+- Default: based on **memory address** | 默认基于内存地址
+
+---
+
+### 🔍 Q3: Hash Collisions & Solutions | 哈希碰撞与解决方案
+
+**English**: What is a hash collision, and how does HashMap solve it?  
+**中文**: 什么是哈希碰撞？HashMap是如何解决哈希碰撞的？
+
+#### 💡 Answer | 答案
+
+```mermaid
+graph TB
+    A[HashMap] --> B[Bucket 0: LinkedList]
+    A --> C[Bucket 1: LinkedList]
+    A --> D[Bucket 2: LinkedList]
+    
+    B --> E[Entry A]
+    E --> F[Entry B]
+    F --> G[Entry C]
+    
+    C --> H[Entry D]
+    D --> I[Entry E]
+```
+
+**Hash Collision | 哈希碰撞**:
+- Multiple objects have same `hashCode` | 多个对象哈希码相同
+- Or `hashCode % array length` gives same index | 或计算后得到相同索引
+
+**HashMap Solution | HashMap解决方案**:
+- Each array index points to a **linked list (bucket)** | 每个索引指向链表（桶）
+- Use `equals()` to distinguish keys in same bucket | 用`equals()`区分同桶内的键
+
+---
+
+### 🔍 Q4: equals() and hashCode() Contract | equals()和hashCode()契约
+
+**English**: What is the contract between `equals()` and `hashCode()`? What happens if we override `equals()` but not `hashCode()`?  
+**中文**: `equals()`和`hashCode()`之间的契约是什么？如果重写`equals()`但不重写`hashCode()`会发生什么？
+
+#### 💡 Answer | 答案
+
+```java
+// ✅ Correct implementation | 正确实现
+@Override
+public boolean equals(Object obj) {
+    if (this == obj) return true;
+    if (obj == null || getClass() != obj.getClass()) return false;
+    MyClass other = (MyClass) obj;
+    return this.field.equals(other.field);
+}
+
+@Override
+public int hashCode() {
+    return Objects.hash(field);  // Must override both! | 必须同时重写!
+}
+```
+
+**Core Contract | 核心契约**:
+- If `A.equals(B) == true` → `A.hashCode() == B.hashCode()` | 相等对象必须有相同哈希码
+- Same `hashCode()` ≠ necessarily equal (hash collision) | 相同哈希码不一定相等
+
+**Problem if only override equals() | 仅重写equals()的问题**:
+- 🚨 Equal objects may have different `hashCode()` | 相等对象可能有不同哈希码
+- 🚨 HashMap/HashSet stores duplicates | HashMap/HashSet会存储重复项
+- 🚨 Fails deduplication | 无法实现去重效果
+
+---
+
+### 🔍 Q5: Good Hash Function Criteria | 优质哈希函数标准
+
+**English**: What are the criteria for a good hash function, and why is number 31 often used?  
+**中文**: 优质哈希函数的判定标准是什么？为什么常使用数字31？
+
+#### 💡 Answer | 答案
+
+**Criteria for Good Hash Function | 优质哈希函数标准**:
+
+| Criterion | Description | Importance |
+|-----------|-------------|------------|
+| **Even Distribution** | Covers int value range | ✅ Reduces collisions |
+| **Sensitivity** | Small input changes → different hashes | ✅ Avoids similar hashes |
+| **Low Computational Cost** | Fast computation | ✅ Ensures efficiency |
+
+**Why Number 31? | 为什么使用31**:
+
+```java
+// Efficient computation with 31 | 31的高效计算
+31 * x = (x << 5) - x  // Bitwise operations faster | 位运算更快
+
+// Avoids value cancellation | 避免值抵消
+// 31 is odd prime → all fields contribute to final index
+// 31是奇数质数 → 所有字段都影响最终索引
+```
+
+**Key Reasons | 关键原因**:
+1. **Efficient**: Bitwise operations | 高效：位运算
+2. **Avoids cancellation**: Odd prime property | 避免抵消：奇数质数特性
+
+---
+
+### 🔍 Q6: HashSet Implementation | HashSet 实现原理
+
+**English**: How is HashSet implemented, and what core characteristics does it have?  
+**中文**: HashSet是如何实现的？它具有哪些核心特性？
+
+#### 💡 Answer | 答案
+
+```java
+// HashSet internal implementation | HashSet内部实现
+public class HashSet<E> {
+    private HashMap<E, Object> map;
+    private static final Object PRESENT = new Object();
+    
+    public boolean add(E e) {
+        return map.put(e, PRESENT) == null;  // Use as HashMap key
+    }
+    
+    public boolean contains(Object o) {
+        return map.containsKey(o);  // Delegate to HashMap
+    }
+}
+```
+
+**Core Characteristics | 核心特性**:
+
+| Characteristic | Description | Benefit |
+|----------------|-------------|---------|
+| **No Duplicates** | Uses HashMap key uniqueness | ✅ Automatic deduplication |
+| **No Ordering** | Elements stored by hash index | ✅ Fast access |
+| **Efficient Operations** | O(1) average time complexity | ✅ High performance |
+
+**底层原理**: 基于HashMap实现，元素作为键，忽略对应的值  
+**特性**: 无重复元素、无顺序保证、操作高效(O(1))
+
+---
+
+### 🔍 Q7: HashMap Rehashing | HashMap 重哈希
+
+**English**: What is rehashing in HashMap, and when does it happen?  
+**中文**: HashMap中的"重哈希"是什么？它在什么情况下发生？
+
+#### 💡 Answer | 答案
+
+```java
+// Rehashing process | 重哈希过程
+void resize(int newCapacity) {
+    Entry[] newTable = new Entry[newCapacity];
+    for (Entry<K,V> e : table) {
+        while (e != null) {
+            Entry<K,V> next = e.next;
+            int newIndex = hash(e.key) % newCapacity;  // Recalculate index
+            e.next = newTable[newIndex];
+            newTable[newIndex] = e;
+            e = next;
+        }
+    }
+    table = newTable;
+}
+```
+
+**Rehashing Definition | 重哈希定义**:
+- **Expands array capacity** | 扩大数组容量
+- **Recomputes all key indices** | 重新计算所有键的索引
+- **Migrates key-value pairs** | 迁移键值对到新桶
+
+**When Rehashing Occurs | 重哈希发生时机**:
+- 🚨 Too many elements in same bucket | 同一桶中元素过多
+- 🚨 Load factor exceeded | 超过负载因子
+- 🚨 Lookup efficiency degrades to O(n) | 查找效率退化到O(n)
+
+**Purpose | 目的**: Maintain O(1) average time complexity | 保持O(1)平均时间复杂度
+
+---
+
+<div align="center">
+🔍 <em>Searching & Hashing concepts covered · Continue exploring! | 查找与哈希概念已覆盖 · 继续探索!</em>
+</div>
+
+---
+
+## 🚀 Quick Navigation | 快速导航
+
+| Section | 章节 | Key Topics | 关键主题 |
+|---------|------|------------|----------|
+| 🎯 One | 一 | ADT Core Concepts | ADT核心概念 |
+| ⚙️ Two | 二 | Java OOP & ADT | Java面向对象 |
+| 📊 Three | 三 | Performance Analysis | 性能分析 |
+| 🔒 Four | 四 | Access Control | 访问控制 |
+| 🔄 Five | 五 | Iterators | 迭代器 |
+| 🔎 Six | 六 | Searching & Hashing | 查找与哈希 |
+
+**🔗 Connect**: Feel free to contribute or raise issues! | 欢迎贡献或提出问题！
+
+---
+
